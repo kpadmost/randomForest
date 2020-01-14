@@ -13,8 +13,12 @@ ratest <- function() {
   fit1 <- rpart(murder ~ population + illiteracy + income + life.exp +
                   hs.grad + frost + region, data = mystate,
                 method = ulist, minsplit = 10, parms=list(totalAttributes=7, samplingAttributes=3))
-
+  mykip <- data.frame(kyphosis)
+  names(mykip) <- casefold(names(mykip)) #remove mixed case
+  fit1 <- rpart(Kyphosis ~ Age + Number + Start, data=mykip,
+                method=ulist,minsplit = 10, parms=list(totalAttributes=3, samplingAttributes=1))
   par(xpd = TRUE)
   plot(fit1)
   text(fit1, use.n=TRUE)
+  summary(fit1)
 }
