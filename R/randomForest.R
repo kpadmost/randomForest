@@ -1,7 +1,7 @@
 #' @import rpart
 
 
-mowRandomForest <- function(formula, data, ntrees=500, maxdepth=30, samplingAttributes=NULL, treeParams) {
+mowRandomForest <- function(formula, data, ntrees=500, maxdepth=30, samplingAttributes=NULL, ...) {
   len <- nrow(data)
 
   responsecol <- all.vars(formula)[1] # TODO: move to validateParms
@@ -11,14 +11,14 @@ mowRandomForest <- function(formula, data, ntrees=500, maxdepth=30, samplingAttr
   if(is.null(samplingAttributes)) {
     samplingAttributes <- sqrt(totalAttrs)
   }
-  parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes)
+  parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes, ylevels=ylevels)
 
   bagged_models=list()
 
   for (i in 1:ntrees)
   {
     new_sample=sample.int(len, size=len,replace=T)
-    bagged_models=c(bagged_models,list(singleTree(formula, data=data[new_sample,], parms = parms, unlist(treeParams))))
+    bagged_models=c(bagged_models,list(singleTree(formula, data=data[new_sample,], parms, ...)))
   }
   ans <- list(trees=bagged_models)
   class(ans) <- 'mowRandomForest'
@@ -38,17 +38,18 @@ singleTree <- function(formula, data, parms=NULL, ...) {
       responsecol <- all.vars(formula)[1]
       ylevels <- levels(data[[responsecol]])
       classes <- length(ylevels)
+      parms$ylevels <- ylevels
       parms$classes <- classes
     }
 
     if(is.null(parms$samplingAttributes)) {
-      parms$samplingAttributes <- sqrt(parms$totalAttributes)
+      parms$samplingAttributes <- as.numeric(round(sqrt(parms$totalAttributes)))
     }
 
-    ulist <- list(eval = etempg, split = ginisplit, init = itempg)
+    ulist <- list(eval = gini_eval, split = gini_split, init = gini_init)
     t <- rpart(formula, data=data,
           method=ulist, parms=parms, ...)
-    attr(t, 'ylevels') <-  ylevels
+    attr(t, 'ylevels') <-  parms$ylevels
     t
 }
 
@@ -77,18 +78,15 @@ predict.mowRandomForest <- function(forest, data) {
   df <- data.frame(data)
   trees <- forest$trees
   # voting
-  # votes <- sapply(trees, function(tree) {
-  #   predicted <- predict(tree, data, type='class')
-  #   #predicted <- predict(tree, df)
-  #   predicted
-  # })
-  #
-  # votes <- apply(votes, 1, function(val) {
-  #   res <- sort(table(val), decreasing = T)[1]
-  #   as.numeric(res)
-  # })
-  # votes
-  for(i in 1:nrow(data)) {
+  votes <- sapply(trees, function(tree) {
+    predicted <- predict(tree, data, type='vector')
+    #predicted <- predict(tree, df)
+    predicted
+  })
 
-  }
+  votes <- apply(votes, 1, function(val) {
+    res <- sort(table(val), decreasing = T)[1]
+    as.numeric(names(res))
+  })
+  unname(votes)
 }

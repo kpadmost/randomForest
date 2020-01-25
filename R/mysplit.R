@@ -1,6 +1,6 @@
 
 
-itempg <- function(y, offset, parms, wt) {
+gini_init <- function(y, offset, parms, wt) {
   if (is.matrix(y) && ncol(y) > 1)
     stop("Matrix response not allowed")
   if (!missing(parms) && length(parms) > 0)
@@ -12,12 +12,15 @@ itempg <- function(y, offset, parms, wt) {
           "levels=", ylevel,sep = '')
   }
   initSampling(parms)
+  if(is.null(parms$random)) {
+    parms$random <- FALSE
+  }
+  if(is.null(parms$debug))
+    parms$debug <- FALSE
+
 
   environment(sfun) <- .GlobalEnv
   numr <- length(levels(y)) + 1
-  priori <- table(y) / length(y)
-  parms$priori <- priori
-  parms$classes <- length(levels(y))
   list(y = c(y), ylevels=(levels(y)), parms = parms, numresp = numr, numy = 1,
      print = function(yval, ylevel, digits) {
     temp <- if (is.null(ylevel)) as.character(yval[, 1L])
@@ -78,14 +81,13 @@ gini_impurity <- function(y) {
 }
 
 
-etempg <- function(y, wt, parms) {
-  print('at eval1')
+gini_eval <- function(y, wt, parms) {
+  if(parms$debug)
+    print('at eval1')
   newSampling()
   #wmean <- sum(y*wt)/sum(wt)
   #rss <- sum(wt*(y-wmean)^2)
   classes <- parms$classes
-  priori <- parms$priori
-  # refactor
   counts <- table(1:classes)
   for(i in 1:classes) {
     counts[i] <- 0
@@ -94,9 +96,6 @@ etempg <- function(y, wt, parms) {
   probs <- counts / length(y)
 
   chosen_n <- as.numeric(names((sort(counts, decreasing = T)[1])))
-  print(y)
-  dev <- gini_impurity(y) * 100
-  print(dev)
   lab <- c(chosen_n, unname(probs))
   wmean <- sum(y*wt)/sum(wt)
   rss <- sum(wt*(y-wmean)^2)
@@ -113,16 +112,14 @@ gini_process <-function(classes, splitvar){
   return(sum(base_prob * c(No_Node_Gini,Yes_Node_Gini)))
 }
 
-ginisplit <- function(y, wt, x, parms, continuous) {
+gini_split <- function(y, wt, x, parms, continuous) {
   debug <- parms$debug
-  random <- parms$rand
+  random <- parms$random
   n <- length(y)
   nclasses <- parms$classes
-  #isNotSampled <- !isSampledAttribute()
-  random <- F
-  isNotSampled <- F
-#  print('at split1')
-  # if is not sampled attribute
+  isNotSampled <- !isSampledAttribute()
+  if(debug)
+    print(isNotSampled)
   if(isNotSampled)
     if(continuous)
       return(list(goodness=rep(0, n - 1), direction=rep(1, n - 1)))
@@ -133,9 +130,6 @@ ginisplit <- function(y, wt, x, parms, continuous) {
 
   max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
-    # calc max impurity
-
-
     goodness <- sapply(1:(n - 1), function(i) {
       # get left
       y_left <- y[1:i]
