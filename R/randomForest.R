@@ -1,7 +1,14 @@
 #' @import rpart
 
-
-mowRandomForest <- function(formula, data, ntrees=500, maxdepth=30, samplingAttributes=NULL, ...) {
+#' Create random forest
+#' @param formula - formula of prediction response ~ xvalues, eg y ~ x1 + x2 + x3
+#' @param data - dataset, @note fields should match formula case
+#' @param ntrees - number of trees to grow
+#' @param samplingAttributes - number of attributes to sample from, equal to square root of total attributes by default
+#' @param ... - params of a single tree, according to rpart, exsample - minsplit
+#' @return - random forest
+#' @export
+mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, ...) {
   len <- nrow(data)
 
   responsecol <- all.vars(formula)[1] # TODO: move to validateParms
@@ -25,6 +32,7 @@ mowRandomForest <- function(formula, data, ntrees=500, maxdepth=30, samplingAttr
   ans
 }
 
+#' @export
 singleTree <- function(formula, data, parms=NULL, ...) {
     if(is.null(parms))
       parms <- list()
@@ -74,6 +82,7 @@ ratest <- function() {
   summary(fit1)
 }
 
+#' @export
 predict.mowRandomForest <- function(forest, data) {
   df <- data.frame(data)
   trees <- forest$trees
