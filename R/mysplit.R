@@ -14,45 +14,42 @@ itempg <- function(y, offset, parms, wt) {
   initSampling(parms)
 
   environment(sfun) <- .GlobalEnv
-  numr <- 1#length(levels(y))
-  list(y = c(y), parms = parms, numresp = 1, numy = 1,  print = function(yval, ylevel, digits) {
+  numr <- length(levels(y)) + 1
+  priori <- table(y) / length(y)
+  parms$priori <- priori
+  parms$classes <- length(levels(y))
+  list(y = c(y), ylevels=(levels(y)), parms = parms, numresp = numr, numy = 1,
+     print = function(yval, ylevel, digits) {
     temp <- if (is.null(ylevel)) as.character(yval[, 1L])
     else ylevel[yval[, 1L]]
 
-    nclass <- (ncol(yval) - 2L)/2L
+    nclass <- ncol(yval) - 1L
     yprob <- if (nclass < 5L)
-      format(yval[, 1L + nclass + 1L:nclass],
-             digits = digits, nsmall = digits)
-    else formatg(yval[, 1L + nclass + 1L:nclass], digits = 2L)
+      format(yval[, 1L + 1L:nclass],
+             digits = digits)
+    else format(yval[, 1L + 1L:nclass], digits = 2L)
     if (!is.matrix(yprob)) #this case only occurs for no split trees
       yprob <- matrix(yprob, nrow = 1L)
-    ## FIXME: improve code
+
     temp <- paste0(temp, " (", yprob[, 1L])
     for (i in 2L:ncol(yprob)) temp <- paste(temp, yprob[, i], sep = " ")
     temp <- paste0(temp, ")")
     temp
   },
   summary = function(yval, dev, wt, ylevel, digits) {
-    nclass <- (ncol(yval) - 2L) /2L
+    nclass <- ncol(yval) - 1L
     group <- yval[, 1L]
-    counts <- yval[, 1L + (1L:nclass)]
-    yprob <- yval[, 1L + nclass + 1L:nclass]
-    nodeprob <- yval[, 2L * nclass + 2L]
+    yprob <- yval[, 1L + 1L:nclass]
     if (!is.null(ylevel)) group <- ylevel[group]
 
-    temp1 <- formatg(counts, format = "%5g")
-    temp2 <- formatg(yprob, format = "%5.3f")
+    temp2 <- format(yprob, format = "%5.3f")
     if (nclass >1) {
-      temp1 <- apply(matrix(temp1, ncol = nclass), 1L,
-                     paste, collapse = " ")
       temp2 <- apply(matrix(temp2, ncol = nclass), 1L,
                      paste, collapse = " ")
     }
-    dev <- dev/(wt[1L] * nodeprob)
+    #dev <- dev/(wt[1L] * nodeprob)
     paste0("  predicted class=", format(group, justify = "left"),
-           "  expected loss=", formatg(dev, digits),
-           "  P(node) =", formatg(nodeprob, digits), "\n",
-           "    class counts: ", temp1, "\n",
+           "  expected loss=", format(dev, digits),
            "   probabilities: ", temp2)
   },
   text = function(yval, dev, wt, ylevel, digits, n, use.n) {
@@ -61,7 +58,7 @@ itempg <- function(y, offset, parms, wt) {
     counts <- yval[, 1L+ (1L:nclass)]
     if (!is.null(ylevel)) group <- ylevel[group]
 
-    temp1 <- formatg(counts, digits)
+    temp1 <- format(counts, digits)
     if (nclass > 1L)
       temp1 <- apply(matrix(temp1, ncol = nclass), 1L,
                      paste, collapse = "/")
@@ -87,6 +84,7 @@ etempg <- function(y, wt, parms) {
   #wmean <- sum(y*wt)/sum(wt)
   #rss <- sum(wt*(y-wmean)^2)
   classes <- parms$classes
+  priori <- parms$priori
   # refactor
   counts <- table(1:classes)
   for(i in 1:classes) {
@@ -96,12 +94,13 @@ etempg <- function(y, wt, parms) {
   probs <- counts / length(y)
 
   chosen_n <- as.numeric(names((sort(counts, decreasing = T)[1])))
-  dev <- gini_impurity(y)
-  lab <- c(chosen_n, unname(probs))
   print(y)
-  print(lab)
+  dev <- gini_impurity(y) * 100
   print(dev)
-  list(label = chosen_n, deviance = dev)
+  lab <- c(chosen_n, unname(probs))
+  wmean <- sum(y*wt)/sum(wt)
+  rss <- sum(wt*(y-wmean)^2)
+  list(label = lab, deviance = rss)
 }
 
 gini_process <-function(classes, splitvar){
@@ -115,10 +114,14 @@ gini_process <-function(classes, splitvar){
 }
 
 ginisplit <- function(y, wt, x, parms, continuous) {
+  debug <- parms$debug
+  random <- parms$rand
   n <- length(y)
+  nclasses <- parms$classes
   #isNotSampled <- !isSampledAttribute()
+  random <- F
   isNotSampled <- F
-  print('at split1')
+#  print('at split1')
   # if is not sampled attribute
   if(isNotSampled)
     if(continuous)
@@ -127,44 +130,59 @@ ginisplit <- function(y, wt, x, parms, continuous) {
       nu <- length(unique(x))
       return(list(goodness=rep(0, nu - 1), direction=rep(1, nu)))
     }
-  # print(y)
-  # print(x)
-  # print(n)
-  print(continuous)
+
+  max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
-    goodness <- sapply(x[-n], function(value) {
-      1 - gini_process(y, x <= value)
+    # calc max impurity
+
+
+    goodness <- sapply(1:(n - 1), function(i) {
+      # get left
+      y_left <- y[1:i]
+      # lmean <- mean(y_left)
+
+      y_right <- y[(i + 1):n]
+      # rmean <- mean(y_right)
+
+      g_left <- gini_impurity(y_left)
+      g_right <- gini_impurity(y_right)
+      gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
     })
-    print(goodness)
-    goodness <- rep(0.33, n - 1)
-    goodness[(n - 1) %/% 2] <- 0.6
-    print(goodness)
+    #print(max_impurity)
+   # print(goodness)
+    if(random) {
+      goodness <- rep(0.33, n - 1)
+      goodness[(n - 1) %/% 2] <- 1.6
+    }
+   # print(goodness)
     list(goodness=goodness, direction=rep(1, n - 1))
   } else {
-    # calc avg y val -
-    ux <- sort(unique(x))
-    wtsum <- tapply(wt, x, sum)
-    ysum <- tapply(y*wt, x, sum)
-    means <- ysum/wtsum
-    ord <- order(means)
-    n <- length(ord)
+    xUnique <- unique(x)
+    n <- length(xUnique)
+    gini_val <- sapply(xUnique, function(val) {
+      pass <- x == val
+      # get left
+      y_left <- y[pass]
+      # lmean <- mean(y_left)
 
-    goodness <- sapply(ux[-n], function(value) {
-      1 - gini_process(y, value)
+      y_right <- y[!pass]
+      # rmean <- mean(y_right)
+
+      g_left <- gini_impurity(y_left)
+      g_right <- gini_impurity(y_right)
+      impurity <- gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
+      list(impurity=goodness, x=val)
     })
-    print(goodness)
-    goodness <- rep(0.33, n - 1)
-    goodness[(n - 1) %/% 2] <- 0.6
-    print(goodness)
-    list(goodness=goodness, direction=rep(1, n - 1))
+    sorted_by_val <- gini_val[order(sapply(gini_val, function(x) x$impurity))]
+    list(goodness= sapply(sorted_by_val, function(x) x$impurity)[-n],
+         direction = sapply(sorted_by_val, function(x) x$val))
   }
 }
 
-stemp <- function(y, wt, x, parms, continuous)
-{
+stempo <- function(y, wt, x, parms, continuous) {
   n <- length(y)
-  #y <- y- sum(y*wt)/sum(wt)
-  print(isSampledAttribute())
+  y <- y- sum(y*wt)/sum(wt)
+  #print(isSampledAttribute())
   if (continuous) {
     # continuous x variable
     temp <- cumsum(y*wt)[-n]
@@ -192,10 +210,11 @@ stemp <- function(y, wt, x, parms, continuous)
     right.wt <- sum(wt) - left.wt
     lmean <- temp/left.wt
     rmean <- -temp/right.wt
-    goodness <- rep(0.33, n - 1)
-    goodness[(n - 1) %/% 2] <- 0.6
+    # goodness <- rep(0.33, n - 1)
+    # goodness[n %/% 2] <- 0.6
+    # print(ux[ord])
     list(goodness= (left.wt*lmean^2 + right.wt*rmean^2)/sum(wt*y^2),
-         direction = ux[ord], parms=parms)
+         direction = ux[ord])
   }
 }
 
