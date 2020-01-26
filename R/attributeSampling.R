@@ -1,3 +1,10 @@
+#' implementation of sampling attributes function
+#' implementation based on custom environment
+#' Since package of environment cannot be modified at runtime, we use trick - replacing env. value as in saveToStorage function
+#' in beforemention storage we are keeping both initial parameters as well as attribute index, with each call we increase it
+#' Thus we guarantee that in each split there are exactly nsampled attributes selected
+
+
 storage <- new.env(parent = emptyenv())
 storage$samplingParams <- list()
 storage$samplingMode <- list()
@@ -17,6 +24,7 @@ saveToStorage <- function(valueName, value) {
 }
 
 
+# function for initialization of sampling, pass params to storage
 initSampling <- function(params) {
   totalAttributes <- params$totalAttributes
   samplingAttributes <- params$samplingAttributes
@@ -24,6 +32,8 @@ initSampling <- function(params) {
   initStorage(totalAttributes, samplingAttributes)
 }
 
+
+# new sampling, sample attributes based on samplingAttribute params
 newSampling <- function() {
   storage <- getStorage()
   params <- storage$samplingParams
@@ -32,6 +42,8 @@ newSampling <- function() {
   saveToStorage('samplingMode', list(index=1, samples=samples))
 }
 
+
+# check if attribute sampled, if positive, remove
 isSampledAttribute <- function() {
   storage <- getStorage()
   samplingMode <- storage$samplingMode

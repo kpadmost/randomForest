@@ -1,4 +1,4 @@
-
+# Here is a set of user split functions of rpart. For details, look for rpart user-written split functions
 
 gini_init <- function(y, offset, parms, wt) {
   if (is.matrix(y) && ncol(y) > 1)
@@ -11,7 +11,10 @@ gini_init <- function(y, offset, parms, wt) {
           ", MSE=" , format(signif(dev/wt, digits)),
           "levels=", ylevel,sep = '')
   }
-  initSampling(parms)
+
+  initSampling(parms) # initialize sampling
+
+  # debug params
   if(is.null(parms$random)) {
     parms$random <- FALSE
   }
@@ -20,8 +23,8 @@ gini_init <- function(y, offset, parms, wt) {
 
 
   environment(sfun) <- .GlobalEnv
-  numr <- length(levels(y)) + 1
-  list(y = c(y), ylevels=(levels(y)), parms = parms, numresp = numr, numy = 1,
+  numr <- parms$classes + 1
+  list(y = c(y), ylevels=(levels(as.factor(y))), parms = parms, numresp = numr, numy = 1,
      print = function(yval, ylevel, digits) {
     temp <- if (is.null(ylevel)) as.character(yval[, 1L])
     else ylevel[yval[, 1L]]
@@ -71,12 +74,7 @@ gini_init <- function(y, offset, parms, wt) {
 }
 
 
-gini_node <- function(y) {
-  counts <- unname(tapply(y, as.factor(y), length))
-  1 - sum((counts / length(y)) ^ 2)
-}
-
-gini_impurity <- function(y) {
+gini_impurity <- function(y) {  # calculating gini impurity
   1 - sum((table(y) / length(y)) ** 2)
 }
 
@@ -85,8 +83,7 @@ gini_eval <- function(y, wt, parms) {
   if(parms$debug)
     print('at eval1')
   newSampling()
-  #wmean <- sum(y*wt)/sum(wt)
-  #rss <- sum(wt*(y-wmean)^2)
+
   classes <- parms$classes
   counts <- table(1:classes)
   for(i in 1:classes) {
@@ -97,20 +94,12 @@ gini_eval <- function(y, wt, parms) {
 
   chosen_n <- as.numeric(names((sort(counts, decreasing = T)[1])))
   lab <- c(chosen_n, unname(probs))
+
   wmean <- sum(y*wt)/sum(wt)
   rss <- sum(wt*(y-wmean)^2)
   list(label = lab, deviance = rss)
 }
 
-gini_process <-function(classes, splitvar){
-  base_prob <-table(splitvar)/length(splitvar)
-  if(length(base_prob) == 1) return(1)
-  crosstab <- table(classes,splitvar)
-  crossprob <- prop.table(crosstab,2)
-  No_Node_Gini <- 1-sum(crossprob[,1]**2)
-  Yes_Node_Gini <- 1-sum(crossprob[,2]**2)
-  return(sum(base_prob * c(No_Node_Gini,Yes_Node_Gini)))
-}
 
 gini_split <- function(y, wt, x, parms, continuous) {
   debug <- parms$debug
@@ -118,8 +107,10 @@ gini_split <- function(y, wt, x, parms, continuous) {
   n <- length(y)
   nclasses <- parms$classes
   isNotSampled <- !isSampledAttribute()
-  if(debug)
-    print(isNotSampled)
+  if(debug) {
+    print(paste('at split', isNotSampled))
+  }
+
   if(isNotSampled)
     if(continuous)
       return(list(goodness=rep(0, n - 1), direction=rep(1, n - 1)))
@@ -131,160 +122,42 @@ gini_split <- function(y, wt, x, parms, continuous) {
   max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
     goodness <- sapply(1:(n - 1), function(i) {
-      # get left
       y_left <- y[1:i]
-      # lmean <- mean(y_left)
-
       y_right <- y[(i + 1):n]
-      # rmean <- mean(y_right)
 
       g_left <- gini_impurity(y_left)
       g_right <- gini_impurity(y_right)
       gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
     })
-    #print(max_impurity)
-   # print(goodness)
+    # compare with random split
     if(random) {
       goodness <- rep(0.33, n - 1)
       goodness[(n - 1) %/% 2] <- 1.6
     }
-   # print(goodness)
     list(goodness=goodness, direction=rep(1, n - 1))
   } else {
     xUnique <- unique(x)
     n <- length(xUnique)
-    gini_val <- sapply(xUnique, function(val) {
+    ny <- length(y)
+    gini_val <- lapply(xUnique, function(val) {
       pass <- x == val
-      # get left
       y_left <- y[pass]
-      # lmean <- mean(y_left)
-
+      nleft <- length(y_left)
       y_right <- y[!pass]
-      # rmean <- mean(y_right)
 
       g_left <- gini_impurity(y_left)
       g_right <- gini_impurity(y_right)
-      impurity <- gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
-      list(impurity=goodness, x=val)
+      impurity <- 2 * max_impurity - ((g_left * nleft + g_right * (ny - nleft)) / ny)
+      list(impurity=impurity, val=val)
     })
-    sorted_by_val <- gini_val[order(sapply(gini_val, function(x) x$impurity))]
-    list(goodness= sapply(sorted_by_val, function(x) x$impurity)[-n],
-         direction = sapply(sorted_by_val, function(x) x$val))
+    xorder <- order(sapply(gini_val, function(x) x$impurity))
+    sorted_by_val <- gini_val[xorder]
+    goodness <- sapply(sorted_by_val, function(x) x$impurity)[-n]
+    if(random) {
+      goodness <- rep(0.33, n - 1)
+      goodness[(n - 1) %/% 2] <- 1.6
+    }
+    list(goodness=goodness,
+         direction=sapply(sorted_by_val, function(x) x$val))
   }
 }
-
-stempo <- function(y, wt, x, parms, continuous) {
-  n <- length(y)
-  y <- y- sum(y*wt)/sum(wt)
-  #print(isSampledAttribute())
-  if (continuous) {
-    # continuous x variable
-    temp <- cumsum(y*wt)[-n]
-    left.wt <- cumsum(wt)[-n]
-    right.wt <- sum(wt) - left.wt
-    lmean <- temp/left.wt
-    rmean <- -temp/right.wt
-    goodness <- (left.wt*lmean^2 + right.wt*rmean^2)/sum(wt*y^2)
-
-    goodness <- rep(0.33, n - 1)
-    goodness[(n - 1) %/% 2] <- 0.6
-    list(goodness = goodness, direction = sign(lmean))
-  } else {
-    # Categorical X variable
-    ux <- sort(unique(x))
-    wtsum <- tapply(wt, x, sum)
-    ysum <- tapply(y*wt, x, sum)
-    means <- ysum/wtsum
-    # For anova splits, we can order the categories by their means
-    # then use the same code as for a non-categorical
-    ord <- order(means)
-    n <- length(ord)
-    temp <- cumsum(ysum[ord])[-n]
-    left.wt <- cumsum(wtsum[ord])[-n]
-    right.wt <- sum(wt) - left.wt
-    lmean <- temp/left.wt
-    rmean <- -temp/right.wt
-    # goodness <- rep(0.33, n - 1)
-    # goodness[n %/% 2] <- 0.6
-    # print(ux[ord])
-    list(goodness= (left.wt*lmean^2 + right.wt*rmean^2)/sum(wt*y^2),
-         direction = ux[ord])
-  }
-}
-
-
-etemp <- function(y, wt, parms) {
-  wmean <- sum(y*wt)/sum(wt)
-  rss <- sum(wt*(y-wmean)^2)
-
-  newSampling()
-
-  list(label = wmean, deviance = rss)
-}
-
-itemp <- function(y, offset, parms, wt) {
-  if (is.matrix(y) && ncol(y) > 1)
-    stop("Matrix response not allowed")
-  if (!missing(parms) && length(parms) > 0)
-    warning("parameter argument ignored")
-  if (length(offset)) y <- y - offset
-  sfun <- function(yval, dev, wt, ylevel, digits ) {
-    paste(" mean=", format(signif(yval, digits)),
-          ", MSE=" , format(signif(dev/wt, digits)),
-          sep = '')
-  }
-
-  initSampling(parms)
-
-  environment(sfun) <- .GlobalEnv
-  list(y = c(y), parms = NULL, numresp = 1, numy = 1, summary = sfun)
-}
-
-stemp <- function(y, wt, x, parms, continuous)
-{
-
-  n <- length(y)
-  isNotSampled <- !isSampledAttribute()
-  print(isNotSampled)
-  # if is not sampled attribute
-  if(isNotSampled)
-    if(continuous)
-      return(list(goodness=rep(0, n - 1), direction=rep(1, n - 1)))
-  else {
-    nu <- length(unique(x))
-    return(list(goodness=rep(0, nu - 1), direction=rep(1, nu)))
-  }
-  # Center y
-  y <- y- sum(y*wt)/sum(wt)
-  if (continuous) {
-    # continuous x variable
-    temp <- cumsum(y*wt)[-n]
-    left.wt <- cumsum(wt)[-n]
-    right.wt <- sum(wt) - left.wt
-    lmean <- temp/left.wt
-    rmean <- -temp/right.wt
-    goodness <- (left.wt*lmean^2 + right.wt*rmean^2)/sum(wt*y^2)
-    list(goodness = goodness, direction = sign(lmean))
-  } else {
-    # Categorical X variable
-    ux <- sort(unique(x))
-    wtsum <- tapply(wt, x, sum)
-    ysum <- tapply(y*wt, x, sum)
-    means <- ysum/wtsum
-    # For anova splits, we can order the categories by their means
-    # then use the same code as for a non-categorical
-    ord <- order(means)
-    n <- length(ord)
-    temp <- cumsum(ysum[ord])[-n]
-    left.wt <- cumsum(wtsum[ord])[-n]
-    right.wt <- sum(wt) - left.wt
-    lmean <- temp/left.wt
-    rmean <- -temp/right.wt
-    list(goodness= (left.wt*lmean^2 + right.wt*rmean^2)/sum(wt*y^2),
-         direction = ux[ord])
-  }
-}
-
-
-
-

@@ -1,6 +1,11 @@
 #' @import rpart
 
-#' Create random forest
+
+
+
+#' @name mowRandomForest
+#' @title Random Forest
+#' @description Create random forest based on rpart trees
 #' @param formula - formula of prediction response ~ xvalues, eg y ~ x1 + x2 + x3
 #' @param data - dataset, @note fields should match formula case
 #' @param ntrees - number of trees to grow
@@ -12,14 +17,18 @@ mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, 
   len <- nrow(data)
 
   responsecol <- all.vars(formula)[1] # TODO: move to validateParms
-  ylevels <- levels(data[[responsecol]])
+  y <- data[[responsecol]]
+  ylevels <- levels(y)
+  if(!is.factor(y)) {
+    ylevels <- levels(as.factor(y))
+  }
   classes <- length(ylevels)
   totalAttrs <- ncol(data) - 1
   if(is.null(samplingAttributes)) {
-    samplingAttributes <- sqrt(totalAttrs)
+    samplingAttributes <- round(sqrt(totalAttrs))
   }
   parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes, ylevels=ylevels)
-
+  parms$debug = TRUE
   bagged_models=list()
 
   for (i in 1:ntrees)
@@ -32,6 +41,17 @@ mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, 
   ans
 }
 
+
+#' @name singleTree
+#' @title Single rpart tree
+#' @description create single rpart tree based on attributes sampling
+#' @param formula - formula of prediction response ~ xvalues, eg y ~ x1 + x2 + x3
+#' @param data - dataset, @note fields should match formula case
+#' @param parms - atttibutes for sampling, includes
+#' totalAttributes - total number of data attributes, samplingAttributes - number of attributes
+#' to sample at each split(square root of totalAttributes by default)
+#' classes - number of classes in response value
+#' @param ... params of rpart, lookup rpart documentation for more
 #' @export
 singleTree <- function(formula, data, parms=NULL, ...) {
     if(is.null(parms))
@@ -82,6 +102,13 @@ ratest <- function() {
   summary(fit1)
 }
 
+
+#' @name predict
+#' @title Predict classes
+#' @description predict funtion for mowRandomForest
+#' @param forest - mowRandomForest
+#' @param data - data for prediction
+#' @return numeric vector of predicted classes
 #' @export
 predict.mowRandomForest <- function(forest, data) {
   df <- data.frame(data)
