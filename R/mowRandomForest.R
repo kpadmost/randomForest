@@ -28,7 +28,7 @@ mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, 
     samplingAttributes <- round(sqrt(totalAttrs))
   }
   parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes, ylevels=ylevels)
-  parms$debug = TRUE
+  # parms$debug = TRUE
   bagged_models=list()
 
   for (i in 1:ntrees)
