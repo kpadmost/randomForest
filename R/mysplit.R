@@ -1,4 +1,19 @@
+#' @import parallel
+#'
 # Here is a set of user split functions of rpart. For details, look for rpart user-written split functions
+
+mParSapply <- function(...) {
+  cl <- makeCluster(detectCores())
+  res <- parSapply(cl, ...)
+  stopCluster(cl)
+  res
+}
+mParLapply <- function(...) {
+  cl <- makeCluster(detectCores())
+  res <- parLapply(cl, ...)
+  stopCluster(cl)
+  res
+}
 
 gini_init <- function(y, offset, parms, wt) {
   if (is.matrix(y) && ncol(y) > 1)
@@ -102,13 +117,18 @@ gini_eval <- function(y, wt, parms) {
 
 
 gini_split <- function(y, wt, x, parms, continuous) {
+
   debug <- parms$debug
   random <- parms$random
   n <- length(y)
+  chosenSapply <- sapply
+  if(n > 6000) {
+      chosenSapply <- mParSapply
+  }
   nclasses <- parms$classes
   isNotSampled <- !isSampledAttribute()
   if(debug) {
-    print(paste('at split', isNotSampled))
+    print(paste('at split', isNotSampled, continuous, n))
   }
 
   if(isNotSampled)
@@ -121,7 +141,10 @@ gini_split <- function(y, wt, x, parms, continuous) {
 
   max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
-    goodness <- sapply(1:(n - 1), function(i) {
+    goodness <- chosenSapply(X=1:(n - 1), FUN=function(i) {
+      if(debug) {
+        print(paste('at splitc', i))
+      }
       y_left <- y[1:i]
       y_right <- y[(i + 1):n]
 
@@ -134,10 +157,13 @@ gini_split <- function(y, wt, x, parms, continuous) {
       goodness <- rep(0.33, n - 1)
       goodness[(n - 1) %/% 2] <- 1.6
     }
+
     list(goodness=goodness, direction=rep(1, n - 1))
   } else {
     xUnique <- unique(x)
     n <- length(xUnique)
+    if(debug)
+      print(paste('xvelels', n))
     ny <- length(y)
     gini_val <- lapply(xUnique, function(val) {
       pass <- x == val

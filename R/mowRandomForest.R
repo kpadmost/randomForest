@@ -3,6 +3,7 @@
 
 
 
+
 #' @name mowRandomForest
 #' @title Random Forest
 #' @description Create random forest based on rpart trees
@@ -13,7 +14,7 @@
 #' @param ... - params of a single tree, according to rpart, exsample - minsplit
 #' @return - random forest
 #' @export
-mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, ...) {
+mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, debug=FALSE,...) {
   len <- nrow(data)
 
   responsecol <- all.vars(formula)[1] # TODO: move to validateParms
@@ -27,8 +28,9 @@ mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, 
   if(is.null(samplingAttributes)) {
     samplingAttributes <- round(sqrt(totalAttrs))
   }
+  print(paste('ta', totalAttrs, 'sa', samplingAttributes))
   parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes, ylevels=ylevels)
-  # parms$debug = TRUE
+  parms$debug = debug
   bagged_models=list()
 
   for (i in 1:ntrees)
