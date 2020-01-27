@@ -126,16 +126,29 @@ gini_split <- function(y, wt, x, parms, continuous) {
   max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
     goodness <- c()
-    y_left <- c()
-    y_right <- y
+    y_rightt <- table(y)
+    y_leftt <- y_rightt
+    for(i in length(y_leftt)) {
+      y_leftt[i] <- 0
+    }
     for(i in 1:(n - 1)) {
-      y_left <- c(y_left, y[i])
-      y_right <- y_right[-1]
-      g_left <- gini_impurity(y_left)
-      g_right <- gini_impurity(y_right)
+      y_rightt[y[i]] <- y_rightt[y[i]] - 1
+      y_leftt[y[i]] <- y_leftt[y[i]] + 1
+      g_left <- 1 - sum((y_leftt / i) ** 2)
+      g_right <- 1 - sum((y_rightt / (n - i)) ** 2)
       gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
       goodness <- c(goodness, gnode)
     }
+    # y_left <- c()
+    # y_right <- y
+    # for(i in 1:(n - 1)) {
+    #   y_left <- c(y_left, y[i])
+    #   y_right <- y_right[-1]
+    #   g_left <- gini_impurity(y_left)
+    #   g_right <- gini_impurity(y_right)
+    #   gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
+    #   goodness <- c(goodness, gnode)
+    # }
     # goodness <- sapply(X=1:(n - 1), FUN=function(i) {
     #   y_left <- y[1:i]
     #   y_right <- y[(i + 1):n]

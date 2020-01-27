@@ -28,7 +28,8 @@ mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, 
   if(is.null(samplingAttributes)) {
     samplingAttributes <- round(sqrt(totalAttrs))
   }
-  print(paste('ta', totalAttrs, 'sa', samplingAttributes))
+  if(debug)
+  print(paste('ta', totalAttrs, 'sa', samplingAttributes, 'yl', length(y)))
   parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes, ylevels=ylevels)
   parms$debug = debug
   cl <- makeCluster(detectCores())
