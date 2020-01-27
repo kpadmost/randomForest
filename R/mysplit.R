@@ -11,7 +11,7 @@ mParSapply <- function(...) {
 mParLapply <- function(...) {
   cl <- makeCluster(detectCores())
   res <- parLapply(cl, ...)
-  stopCluster(cl)
+
   res
 }
 
@@ -122,7 +122,7 @@ gini_split <- function(y, wt, x, parms, continuous) {
   random <- parms$random
   n <- length(y)
   chosenSapply <- sapply
-  if(n > 6000) {
+  if(n > 4000) {
       chosenSapply <- mParSapply
   }
   nclasses <- parms$classes
@@ -142,9 +142,6 @@ gini_split <- function(y, wt, x, parms, continuous) {
   max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
     goodness <- chosenSapply(X=1:(n - 1), FUN=function(i) {
-      if(debug) {
-        print(paste('at splitc', i))
-      }
       y_left <- y[1:i]
       y_right <- y[(i + 1):n]
 
