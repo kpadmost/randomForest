@@ -124,14 +124,19 @@ gini_split <- function(y, wt, x, parms, continuous) {
     }
 
   max_impurity <- 1 - (1 / nclasses)
+
   if(continuous) {
+    print('at split')
     goodness <- c()
     y_rightt <- table(y)
     y_leftt <- y_rightt
-    for(i in length(y_leftt)) {
+    for(i in 1:length(y_leftt)) {
       y_leftt[i] <- 0
     }
+
     for(i in 1:(n - 1)) {
+      print(y_rightt)
+      print(y_leftt)
       y_rightt[y[i]] <- y_rightt[y[i]] - 1
       y_leftt[y[i]] <- y_leftt[y[i]] + 1
       g_left <- 1 - sum((y_leftt / i) ** 2)
