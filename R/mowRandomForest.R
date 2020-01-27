@@ -1,5 +1,5 @@
 #' @import rpart
-
+#' @import parallel
 
 
 
@@ -31,13 +31,13 @@ mowRandomForest <- function(formula, data, ntrees=500, samplingAttributes=NULL, 
   print(paste('ta', totalAttrs, 'sa', samplingAttributes))
   parms <- list(totalAttributes=totalAttrs, classes=classes, samplingAttributes=samplingAttributes, ylevels=ylevels)
   parms$debug = debug
-  bagged_models=list()
+  cl <- makeCluster(detectCores())
 
-  for (i in 1:ntrees)
-  {
+  bagged_models <- parLapply(cl, 1:ntrees, function(x) {
     new_sample=sample.int(len, size=len,replace=T)
-    bagged_models=c(bagged_models,list(singleTree(formula, data=data[new_sample,], parms, ...)))
-  }
+    singleTree(formula, data=data[new_sample,], parms, ...)
+  })
+  stopCluster(cl)
   ans <- list(trees=bagged_models)
   class(ans) <- 'mowRandomForest'
   ans

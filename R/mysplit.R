@@ -1,19 +1,7 @@
-#' @import parallel
+
 #'
 # Here is a set of user split functions of rpart. For details, look for rpart user-written split functions
 
-mParSapply <- function(...) {
-  cl <- makeCluster(detectCores())
-  res <- parSapply(cl, ...)
-  stopCluster(cl)
-  res
-}
-mParLapply <- function(...) {
-  cl <- makeCluster(detectCores())
-  res <- parLapply(cl, ...)
-
-  res
-}
 
 gini_init <- function(y, offset, parms, wt) {
   if (is.matrix(y) && ncol(y) > 1)
@@ -121,10 +109,6 @@ gini_split <- function(y, wt, x, parms, continuous) {
   debug <- parms$debug
   random <- parms$random
   n <- length(y)
-  chosenSapply <- sapply
-  if(n > 4000) {
-      chosenSapply <- mParSapply
-  }
   nclasses <- parms$classes
   isNotSampled <- !isSampledAttribute()
   if(debug) {
@@ -141,14 +125,25 @@ gini_split <- function(y, wt, x, parms, continuous) {
 
   max_impurity <- 1 - (1 / nclasses)
   if(continuous) {
-    goodness <- chosenSapply(X=1:(n - 1), FUN=function(i) {
-      y_left <- y[1:i]
-      y_right <- y[(i + 1):n]
-
+    goodness <- c()
+    y_left <- c()
+    y_right <- y
+    for(i in 1:(n - 1)) {
+      y_left <- c(y_left, y[i])
+      y_right <- y_right[-1]
       g_left <- gini_impurity(y_left)
       g_right <- gini_impurity(y_right)
       gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
-    })
+      goodness <- c(goodness, gnode)
+    }
+    # goodness <- sapply(X=1:(n - 1), FUN=function(i) {
+    #   y_left <- y[1:i]
+    #   y_right <- y[(i + 1):n]
+    #
+    #   g_left <- gini_impurity(y_left)
+    #   g_right <- gini_impurity(y_right)
+    #   gnode <- 2 * max_impurity - ((g_left * i + g_right * (n - i)) / n)
+    # })
     # compare with random split
     if(random) {
       goodness <- rep(0.33, n - 1)
